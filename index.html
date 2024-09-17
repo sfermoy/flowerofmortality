@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flower of Mortality with Time Spiral</title>
+    <!-- D3.js CDN -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- D3.js Shape -->
+    <script src="https://d3js.org/d3-shape.v2.min.js"></script>
+    <!-- D3.js Transition -->
+    <script src="https://d3js.org/d3-transition.v2.min.js"></script>
+    <!-- D3.js Color Scheme -->
+    <script src="https://d3js.org/d3-scale-chromatic.v2.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #87CEEB; /* Sky blue for day */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            transition: background-color 1s;
+        }
+        header {
+            background-color: #4682b4;
+            padding: 20px;
+            text-align: center;
+            color: #fff;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 3em;
+            font-weight: lighter;
+        }
+        .container {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 80px);
+            overflow: hidden;
+        }
+        svg {
+            display: block;
+            margin: 0 auto;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: rgba(70, 130, 180, 0.9);
+            color: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 16px;
+            text-align: center;
+        }
+        .timeline {
+            position: absolute;
+            bottom: 60px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 22px;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+        }
+        /* Sun */
+        .sun {
+            transition: transform 1s;
+            cursor: pointer;
+        }
+        /* Background Transition */
+        .day {
+            background-color: #87CEEB; /* Sky blue */
+        }
+        .night {
+            background-color: #191970; /* Midnight blue */
+        }
+        /* Spiral Style */
+        .spiral-path {
+            fill: none;
+            stroke: #8B4513;
+            stroke-width: 4;
+            cursor: pointer;
+        }
+        .spiral-handle {
+            fill: #FFD700;
+            stroke: #DAA520;
+            stroke-width: 2;
+            cursor: pointer;
+        }
+        /* Flowers */
+        .flower-bed {
+            /* No need for opacity transition */
+        }
+        /* Petal Labels */
+        .petal-label {
+            font-size: 18px;
+            fill: #000;
+            text-anchor: middle;
+        }
+        /* Animated Bird */
+        .bird {
+            fill: #000;
+            cursor: pointer;
+        }
+        /* Slider Style */
+        .slider-container {
+            position: absolute;
+            bottom: 50px; /* Moved up by 1 cm (~38px) */
+            width: 100%;
+            text-align: center;
+        }
+        .slider {
+            width: 80%;
+        }
+    </style>
+</head>
+<body class="day">
+
+    <header>
+        <h1>Flower of Mortality with Time Spiral</h1>
+    </header>
+
+    <div class="container">
+        <div id="flower"></div>
+        <div class="tooltip" id="tooltip"></div>
+        <div class="timeline" id="timeline"></div>
+        <div class="slider-container">
+            <input type="range" min="2000" max="2020" step="0.1" value="2000" class="slider" id="timeSlider">
+        </div>
+    </div>
+
+    <script>
+        // Sample Data: Mortality Causes Over Time (Years 2000 - 2020)
+        const dataOverTime = [
+            {
+                year: 2000,
+                data: [
+                    { cause: "Cardiovascular Diseases", value: 15.0 },
+                    { cause: "Cancers", value: 8.5 },
+                    { cause: "Respiratory Diseases", value: 3.5 },
+                    { cause: "Infectious Diseases", value: 5.0 },
+                    { cause: "Diabetes", value: 1.0 },
+                    { cause: "Other Causes", value: 6.0 }
+                ]
+            },
+            {
+                year: 2005,
+                data: [
+                    { cause: "Cardiovascular Diseases", value: 16.0 },
+                    { cause: "Cancers", value: 9.0 },
+                    { cause: "Respiratory Diseases", value: 3.8 },
+                    { cause: "Infectious Diseases", value: 4.0 },
+                    { cause: "Diabetes", value: 1.2 },
+                    { cause: "Other Causes", value: 5.5 }
+                ]
+            },
+            {
+                year: 2010,
+                data: [
+                    { cause: "Cardiovascular Diseases", value: 17.0 },
+                    { cause: "Cancers", value: 9.5 },
+                    { cause: "Respiratory Diseases", value: 4.0 },
+                    { cause: "Infectious Diseases", value: 3.5 },
+                    { cause: "Diabetes", value: 1.4 },
+                    { cause: "Other Causes", value: 5.0 }
+                ]
+            },
+            {
+                year: 2015,
+                data: [
+                    { cause: "Cardiovascular Diseases", value: 17.5 },
+                    { cause: "Cancers", value: 9.8 },
+                    { cause: "Respiratory Diseases", value: 4.2 },
+                    { cause: "Infectious Diseases", value: 3.0 },
+                    { cause: "Diabetes", value: 1.5 },
+                    { cause: "Other Causes", value: 4.8 }
+                ]
+            },
+            {
+                year: 2020,
+                data: [
+                    { cause: "Cardiovascular Diseases", value: 18.0 },
+                    { cause: "Cancers", value: 10.0 },
+                    { cause: "Respiratory Diseases", value: 4.5 },
+                    { cause: "Infectious Diseases", value: 2.5 },
+                    { cause: "Diabetes", value: 1.6 },
+                    { cause: "Other Causes", value: 4.5 }
+                ]
+            }
+        ];
+
+        // Dimensions
+        const width = window.innerWidth;
+        const height = window.innerHeight - 80; // Subtract header height
+        const centerX = width * 0.5; // Centered sunflower
+        const centerY = height * 0.6; // Positioned slightly lower
+        const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        // Time Variables
+        let currentTime = dataOverTime[0].year;
+
+        // Time Scale
+        const timeExtent = [2000, 2020];
+        const timeScale = d3.scaleLinear()
+            .domain(timeExtent)
+            .range([0, 1]);
+
+        // Declare currentFlowerBed and currentFlowerData before they are used
+        let currentFlowerBed;
+        let currentFlowerData;
+
+        // Slider Control
+        const timeSlider = document.getElementById('timeSlider');
+        timeSlider.addEventListener('input', function() {
+            const t = +this.value;
+            updateTime(t);
+            updateSpiralHandle(t);
+        });
+
+        // SVG Container
+        const svg = d3.select("#flower")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        // Background Rect for Day/Night Transition
+        svg.append("rect")
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("width", width)
+            .attr("height", height)
+            .attr("fill", "transparent");
+
+        // Draw Grass
+        svg.append("rect")
+            .attr("x", 0)
+            .attr("y", centerY + 150)
+            .attr("width", width)
+            .attr("height", height - centerY - 150)
+            .attr("fill", "#228B22");
+
+        // Draw Sun
+        const sun = svg.append("g")
+            .attr("class", "sun")
+            .attr("transform", `translate(${width * 0.1}, 100)`)
+            .on("click", function() {
+                // Toggle eyes and smile
+                const sunGroup = d3.select(this);
+                const eyes = sunGroup.selectAll(".sun-eye");
+                const smile = sunGroup.select(".sun-smile");
+
+                if (eyes.empty()) {
+                    // Add eyes
+                    sunGroup.append("circle")
+                        .attr("class", "sun-eye")
+                        .attr("cx", -15)
+                        .attr("cy", -10)
+                        .attr("r", 5)
+                        .attr("fill", "#000"); // Left eye
+
+                    sunGroup.append("circle")
+                        .attr("class", "sun-eye")
+                        .attr("cx", 15)
+                        .attr("cy", -10)
+                        .attr("r", 5)
+                        .attr("fill", "#000"); // Right eye
+
+                    // Add smile
+                    sunGroup.append("path")
+                        .attr("class", "sun-smile")
+                        .attr("d", d3.arc()({
+                            innerRadius: 20,
+                            outerRadius: 20,
+                            startAngle: Math.PI + Math.PI / 8,
+                            endAngle: 2 * Math.PI - Math.PI / 8
+                        }))
+                        .attr("transform", "translate(0,10)");
+                } else {
+                    // Remove eyes and smile
+                    eyes.remove();
+                    smile.remove();
+                }
+            });
+
+        sun.append("circle")
+            .attr("r", 50)
+            .attr("fill", "#FFD700");
+
+        // Tooltip
+        const tooltip = d3.select("#tooltip");
+
+        // Draw Main Flower's Stalk
+        svg.append("line")
+            .attr("x1", centerX)
+            .attr("y1", height)
+            .attr("x2", centerX)
+            .attr("y2", centerY - 50) // Extended stalk length
+            .attr("stroke", "#8B4513") // Brown color
+            .attr("stroke-width", 10);
+
+        // Define Gradients and Patterns
+        const defs = svg.append("defs");
+
+        // Petal Gradient
+        const petalGradient = defs.append("linearGradient")
+            .attr("id", "petalGradient")
+            .attr("x1", "0%")
+            .attr("y1", "0%")
+            .attr("x2", "0%")
+            .attr("y2", "100%");
+
+        petalGradient.append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", "#FFD700");
+
+        petalGradient.append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", "#FFA500");
+
+        // Draw Sunflower Center with Yellow Background and Spiral
+        const sunflowerCenter = svg.append("g")
+            .attr("transform", `translate(${centerX}, ${centerY})`);
+
+        // Yellow Circle for Sunflower Center
+        sunflowerCenter.append("circle")
+            .attr("r", 70) // Increased size
+            .attr("fill", "#FFD700");
+
+        // Spiral Group inside Sunflower Center
+        const spiralGroup = sunflowerCenter.append("g");
+
+        const spiral = d3.lineRadial()
+            .angle(d => d.angle)
+            .radius(d => d.radius)
+            .curve(d3.curveCardinal);
+
+        const spiralData = [];
+        const numTurns = 3;
+        const pointsPerTurn = 100;
+        const totalPoints = numTurns * pointsPerTurn;
+
+        for (let i = 0; i < totalPoints; i++) {
+            const angle = i / pointsPerTurn * 2 * Math.PI;
+            const radius = (i / totalPoints) * 50 + 10; // Increased radius
+            spiralData.push({ angle, radius });
+        }
+
+        spiralGroup.append("path")
+            .datum(spiralData)
+            .attr("class", "spiral-path")
+            .attr("d", spiral);
+
+        // Spiral Handle
+        const handle = spiralGroup.append("circle")
+            .attr("class", "spiral-handle")
+            .attr("r", 12) // Increased handle size
+            .attr("cx", spiralData[0].radius * Math.cos(spiralData[0].angle))
+            .attr("cy", spiralData[0].radius * Math.sin(spiralData[0].angle))
+            .call(d3.drag()
+                .on("drag", dragged));
+
+        // Update Timeline
+        const timeline = d3.select("#timeline");
+        updateTimeline();
+
+        // Draw Petals
+        let petalGroup = svg.append("g")
+            .attr("id", "petals");
+
+        // Draw Petal Labels
+        let petalLabelsGroup = svg.append("g")
+            .attr("id", "petal-labels");
+
+        // Initial Data
+        updateFlower(dataOverTime[0].data);
+
+        // Function to Update Flower Based on Data
+        function updateFlower(data) {
+            const petalCount = data.length;
+            const petalLengthScale = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.value)])
+                .range([200, 350]); // Increased range for larger petals
+            const angleScale = d3.scaleLinear().domain([0, petalCount]).range([0, 2 * Math.PI]);
+
+            // Data join
+            const petals = petalGroup.selectAll("path")
+                .data(data, d => d.cause);
+
+            // Enter
+            petals.enter()
+                .append("path")
+                .attr("d", (d, i) => {
+                    const angle = angleScale(i);
+                    const length = petalLengthScale(d.value);
+                    return createPetalPath(angle, length);
+                })
+                .attr("fill", "url(#petalGradient)")
+                .attr("transform", `translate(${centerX}, ${centerY})`)
+                .attr("cursor", "pointer")
+                .on("mouseover", function(event, d) {
+                    d3.select(this).attr("stroke", "#fff").attr("stroke-width", 2);
+                    tooltip.style("opacity", 1)
+                        .html(`<strong>${d.cause}</strong><br>Deaths: ${d.value.toFixed(1)} million`);
+                })
+                .on("mousemove", function(event) {
+                    tooltip.style("left", (event.pageX + 10) + "px")
+                           .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function() {
+                    d3.select(this).attr("stroke", null);
+                    tooltip.style("opacity", 0);
+                })
+                .on("click", function(event, d, i) {
+                    const petal = d3.select(this);
+                    pullOffPetal(petal, d, i);
+                });
+
+            // Update
+            petals.transition()
+                .duration(500)
+                .attr("d", (d, i) => {
+                    const angle = angleScale(i);
+                    const length = petalLengthScale(d.value);
+                    return createPetalPath(angle, length);
+                });
+
+            // Exit
+            petals.exit().remove();
+
+            // Update Petal Labels
+            const petalLabels = petalLabelsGroup.selectAll("text")
+                .data(data, d => d.cause);
+
+            petalLabels.enter()
+                .append("text")
+                .attr("class", "petal-label")
+                .style("font-size", "18px") // Increased font size
+                .attr("transform", (d, i) => {
+                    const angle = angleScale(i);
+                    const length = petalLengthScale(d.value) + 30; // Adjusted position
+                    const x = centerX + length * Math.cos(angle);
+                    const y = centerY + length * Math.sin(angle);
+                    const rotation = angle * (180 / Math.PI);
+                    return `translate(${x}, ${y}) rotate(${rotation})`;
+                })
+                .text(d => d.cause);
+
+            petalLabels.transition()
+                .duration(500)
+                .attr("transform", (d, i) => {
+                    const angle = angleScale(i);
+                    const length = petalLengthScale(d.value) + 30;
+                    const x = centerX + length * Math.cos(angle);
+                    const y = centerY + length * Math.sin(angle);
+                    const rotation = angle * (180 / Math.PI);
+                    return `translate(${x}, ${y}) rotate(${rotation})`;
+                });
+
+            petalLabels.exit().remove();
+
+            // Update Flower Bed if Visible
+            if (currentFlowerBed && currentFlowerData) {
+                updateFlowerBed(currentFlowerData);
+            }
+        }
+
+        // Function to Create Petal Path
+        function createPetalPath(angle, length) {
+            const x0 = 0;
+            const y0 = 0;
+            const x1 = length * Math.cos(angle - 0.1);
+            const y1 = length * Math.sin(angle - 0.1);
+            const x2 = length * Math.cos(angle + 0.1);
+            const y2 = length * Math.sin(angle + 0.1);
+
+            return `M${x0},${y0} C${x1 / 2},${y1 / 2} ${x1},${y1} ${x1},${y1} L${x2},${y2} C${x2},${y2} ${x2 / 2},${y2 / 2} ${x0},${y0}`;
+        }
+
+        // Function to Pull Off Petal and Grow Flowers
+        function pullOffPetal(petal, d, index) {
+            const angleScale = d3.scaleLinear().domain([0, dataOverTime[0].data.length]).range([0, 2 * Math.PI]);
+            const angle = angleScale(index);
+            const length = 200; // Adjusted to position flowerbed higher
+            const targetX = width * 0.75; // Position in top right corner
+            const targetY = height - 150; // Position near the bottom, on the grass
+
+            // Remove existing flower bed if any
+            if (currentFlowerBed) {
+                currentFlowerBed.remove();
+            }
+
+            // Store current flower data
+            currentFlowerData = d;
+
+            // Starting position relative to petal's current transform
+            const x0 = centerX;
+            const y0 = centerY;
+
+            // Random control points for Bezier curve
+            const controlPoint1X = x0 + (Math.random() - 0.5) * 200;
+            const controlPoint1Y = y0 + (Math.random() - 0.5) * 200;
+            const controlPoint2X = targetX + (Math.random() - 0.5) * 200;
+            const controlPoint2Y = targetY + (Math.random() - 0.5) * 200;
+
+            // Create path data string
+            const pathData = `M${x0},${y0} C${controlPoint1X},${controlPoint1Y} ${controlPoint2X},${controlPoint2Y} ${targetX},${targetY}`;
+
+            // Create an invisible path element
+            const tempPath = svg.append("path")
+                .attr("d", pathData)
+                .attr("fill", "none")
+                .attr("stroke", "none");
+
+            const totalLength = tempPath.node().getTotalLength();
+
+            petal.transition()
+                .duration(2000)
+                .attrTween("transform", function() {
+                    return function(t) {
+                        const point = tempPath.node().getPointAtLength(t * totalLength);
+                        const dx = point.x - centerX;
+                        const dy = point.y - centerY;
+                        return `translate(${dx}, ${dy})`;
+                    };
+                })
+                .styleTween('opacity', function() {
+                    return d3.interpolate(1, 0);
+                })
+                .on("end", function() {
+                    // Remove the temp path
+                    tempPath.remove();
+                    // Grow Little Flowers
+                    currentFlowerBed = growFlowers(targetX, targetY, d);
+                    petal.remove(); // Remove the petal after the flower bed is created
+                });
+        }
+
+        // Function to Grow Little Flowers
+        function growFlowers(x, y, d) {
+            const flowerGroup = svg.append("g")
+                .attr("class", "flower-bed");
+
+            // For simplicity, using random data for subdivisions
+            const subdivisions = [
+                { name: `${d.cause} Subtype A`, value: d.value * 0.4 },
+                { name: `${d.cause} Subtype B`, value: d.value * 0.3 },
+                { name: `${d.cause} Subtype C`, value: d.value * 0.3 }
+            ];
+            const maxSubValue = d3.max(subdivisions, s => s.value);
+            const flowerScale = d3.scaleLinear().domain([0, maxSubValue]).range([120, 200]); // Increased sizes
+
+            const xScale = d3.scaleBand()
+                .domain(subdivisions.map((s, i) => i))
+                .range([x - 150, x + 150])
+                .padding(0.1);
+
+            subdivisions.forEach((sub, i) => {
+                const offsetX = xScale(i) + xScale.bandwidth() / 2;
+                const flowerHeight = flowerScale(sub.value);
+
+                // Stem
+                flowerGroup.append("line")
+                    .attr("x1", offsetX)
+                    .attr("y1", y)
+                    .attr("x2", offsetX)
+                    .attr("y2", y - flowerHeight)
+                    .attr("stroke", "#8B4513") // Brown color
+                    .attr("stroke-width", 6);
+
+                // Flower Center
+                flowerGroup.append("circle")
+                    .attr("cx", offsetX)
+                    .attr("cy", y - flowerHeight)
+                    .attr("r", 20) // Increased size
+                    .attr("fill", "#8B4513");
+
+                // Petals
+                const petalCount = 8;
+                const petalAngleScale = d3.scaleLinear().domain([0, petalCount]).range([0, 2 * Math.PI]);
+                for (let j = 0; j < petalCount; j++) {
+                    const petalAngle = petalAngleScale(j);
+                    const petalLength = 40; // Increased size
+
+                    flowerGroup.append("path")
+                        .attr("d", createPetalPath(petalAngle, petalLength))
+                        .attr("fill", "url(#petalGradient)")
+                        .attr("transform", `translate(${offsetX}, ${y - flowerHeight})`);
+                }
+
+                // Labels
+                flowerGroup.append("text")
+                    .attr("x", offsetX)
+                    .attr("y", y - flowerHeight - 40) // Adjusted position
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#000")
+                    .attr("font-size", "16px") // Increased font size
+                    .text(sub.name);
+            });
+
+            return flowerGroup;
+        }
+
+        // Function to Update Flower Bed When Time Changes
+        function updateFlowerBed(d) {
+            if (currentFlowerBed) {
+                currentFlowerBed.remove();
+                currentFlowerBed = growFlowers(width * 0.75, height - 150, d);
+            }
+        }
+
+        // Function to Regrow Petals
+        function regrowPetals() {
+            petalGroup.selectAll("path")
+                .transition()
+                .duration(1000)
+                .attr("transform", `translate(${centerX}, ${centerY})`)
+                .style("opacity", 1);
+        }
+
+        // Function to Update Time
+        function updateTime(t) {
+            currentTime = t;
+            // Interpolate data
+            const interpolatedData = interpolateData(t);
+            updateFlower(interpolatedData);
+            updateSunPosition(t);
+            updateBackground(t);
+            updateTimeline();
+        }
+
+        // Function to Interpolate Data
+        function interpolateData(t) {
+            const yearScale = d3.scaleLinear()
+                .domain(timeExtent)
+                .range([0, dataOverTime.length - 1]);
+
+            const index = yearScale(t);
+            const lowerIndex = Math.floor(index);
+            const upperIndex = Math.ceil(index);
+            const ratio = index - lowerIndex;
+
+            if (lowerIndex === upperIndex) {
+                return dataOverTime[lowerIndex].data;
+            } else {
+                const lowerData = dataOverTime[lowerIndex].data;
+                const upperData = dataOverTime[upperIndex].data;
+
+                const interpolatedData = lowerData.map((d, i) => {
+                    const lowerValue = d.value;
+                    const upperValue = upperData[i].value;
+                    return {
+                        cause: d.cause,
+                        value: lowerValue + (upperValue - lowerValue) * ratio
+                    };
+                });
+                return interpolatedData;
+            }
+        }
+
+        // Function to Update Sun Position
+        function updateSunPosition(t) {
+            const sunX = width * ((t - timeExtent[0]) / (timeExtent[1] - timeExtent[0]));
+            const sunY = 100 - 50 * Math.sin(((t - timeExtent[0]) / (timeExtent[1] - timeExtent[0])) * Math.PI);
+            sun.transition()
+                .duration(500)
+                .attr("transform", `translate(${sunX}, ${sunY})`);
+        }
+
+        // Function to Update Background Based on Time
+        function updateBackground(t) {
+            if ((t - timeExtent[0]) / (timeExtent[1] - timeExtent[0]) < 0.5) {
+                d3.select("body").attr("class", "day");
+            } else {
+                d3.select("body").attr("class", "night");
+            }
+        }
+
+        // Function to Update Timeline
+        function updateTimeline() {
+            timeline.text(`Year: ${currentTime.toFixed(0)}`);
+            timeSlider.value = currentTime;
+        }
+
+        // Function to Handle Drag on Spiral
+        function dragged(event) {
+            const [x, y] = d3.pointer(event, this);
+            const radius = Math.sqrt(x * x + y * y);
+
+            // Clamp radius to spiral's range
+            const minRadius = spiralData[0].radius;
+            const maxRadius = spiralData[spiralData.length - 1].radius;
+            const clampedRadius = Math.max(minRadius, Math.min(maxRadius, radius));
+
+            // Find the corresponding time
+            const tNorm = (clampedRadius - minRadius) / (maxRadius - minRadius);
+            const t = timeExtent[0] + tNorm * (timeExtent[1] - timeExtent[0]);
+
+            updateTime(t);
+            timeSlider.value = t;
+
+            // Update Handle Position
+            const index = Math.floor(tNorm * (spiralData.length - 1));
+            const spiralPoint = spiralData[index];
+            handle.attr("cx", spiralPoint.radius * Math.cos(spiralPoint.angle))
+                  .attr("cy", spiralPoint.radius * Math.sin(spiralPoint.angle));
+        }
+
+        // Function to Update Spiral Handle Based on Time
+        function updateSpiralHandle(t) {
+            const minRadius = spiralData[0].radius;
+            const maxRadius = spiralData[spiralData.length - 1].radius;
+            const tNorm = (t - timeExtent[0]) / (timeExtent[1] - timeExtent[0]);
+            const newRadius = minRadius + tNorm * (maxRadius - minRadius);
+            const index = Math.floor(tNorm * (spiralData.length - 1));
+            const newAngle = spiralData[index].angle;
+
+            handle.attr("cx", newRadius * Math.cos(newAngle))
+                  .attr("cy", newRadius * Math.sin(newAngle));
+        }
+
+        // Function to Add a Bird
+        function addBird() {
+            const birdGroup = svg.append("g")
+                .attr("class", "bird-group")
+                .attr("transform", "translate(-100, 50)");
+
+            // Increase the size of the bird
+            const birdSize = 2; // Scale factor for the bird size
+
+            // Add an invisible circle to increase clickable area
+            birdGroup.append("circle")
+                .attr("r", 30) // Larger radius for easier clicking
+                .attr("fill", "transparent")
+                .attr("cursor", "pointer")
+                .on("click", birdClicked);
+
+            // Draw the bird
+            birdGroup.append("path")
+                .attr("class", "bird")
+                .attr("d", `M${10 * birdSize} 0 L${20 * birdSize} ${10 * birdSize} L${30 * birdSize} 0`)
+                .attr("fill", "#000")
+                .attr("cursor", "pointer")
+                .on("click", birdClicked);
+
+            // Function to handle bird click
+            function birdClicked() {
+                // Turn into a red star and fall
+                const transform = d3.select(birdGroup.node()).attr("transform");
+                const [x, y] = transform.match(/translate\(([^,]+),([^)]+)\)/).slice(1).map(Number);
+
+                birdGroup.interrupt();
+
+                birdGroup.selectAll("*").remove(); // Remove existing bird elements
+
+                birdGroup.append("path")
+                    .attr("d", d3.symbol().type(d3.symbolStar).size(500))
+                    .attr("fill", "red")
+                    .attr("transform", `translate(0, 0)`);
+
+                birdGroup.transition()
+                    .duration(2000)
+                    .attr("transform", `translate(${x}, ${height})`)
+                    .style("opacity", 0)
+                    .on("end", function() {
+                        birdGroup.remove();
+                        // Add another bird
+                        addBird();
+                    });
+            }
+
+            // Animate the bird across the screen
+            birdGroup.transition()
+                .duration(40000) // Slowed down bird
+                .attrTween("transform", function() {
+                    return d3.interpolateString("translate(-100, 50)", `translate(${width + 100}, 100)`);
+                })
+                .on("end", function() {
+                    birdGroup.remove();
+                    // Add another bird
+                    addBird();
+                });
+        }
+
+        // Add two birds to the scene
+        addBird();
+        addBird();
+
+    </script>
+</body>
+</html>
